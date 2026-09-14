@@ -14,6 +14,7 @@ const {
   NeedInput,
   Diagnosis,
 } = require("./schemas/slide");
+const { env } = require("./env");
 
 const registry = new OpenAPIRegistry();
 
@@ -104,6 +105,10 @@ registry.registerPath({
             promptTokens: z.number(),
             completionTokens: z.number(),
             estimatedCostUsd: z.number(),
+            model: z.string().nullable().openapi({
+              description:
+                "Model yang benar-benar menjawab, dilaporkan oleh pitchku-ai",
+            }),
           }),
           attempts: z.number(),
         })
@@ -138,6 +143,10 @@ registry.registerPath({
             promptTokens: z.number(),
             completionTokens: z.number(),
             estimatedCostUsd: z.number(),
+            model: z.string().nullable().openapi({
+              description:
+                "Model yang benar-benar menjawab, dilaporkan oleh pitchku-ai",
+            }),
           }),
           attempts: z.number().openapi({ description: "1 berarti tanpa retry" }),
         })
@@ -178,6 +187,10 @@ registry.registerPath({
             promptTokens: z.number(),
             completionTokens: z.number(),
             estimatedCostUsd: z.number(),
+            model: z.string().nullable().openapi({
+              description:
+                "Model yang benar-benar menjawab, dilaporkan oleh pitchku-ai",
+            }),
           }),
           attempts: z.number(),
         })
@@ -306,7 +319,14 @@ function buildOpenApiDoc() {
         "Semua query database memakai token pengguna, jadi Row Level Security " +
         "Supabase yang menjamin pengguna hanya bisa mengakses deck miliknya.",
     },
-    servers: [{ url: "http://localhost:4000", description: "Lokal" }],
+    // Tombol "Try it out" di Swagger memakai server pertama. Tanpa PUBLIC_URL,
+    // /docs di Render akan menembak localhost milik pengunjung, bukan API ini.
+    servers: [
+      ...(env.publicUrl
+        ? [{ url: env.publicUrl, description: "Production" }]
+        : []),
+      { url: `http://localhost:${env.port}`, description: "Lokal" },
+    ],
     tags: [
       { name: "Sistem" },
       { name: "Brand Kit" },

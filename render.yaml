@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: pitchku-backend
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # 22, bukan 20: @supabase/supabase-js sudah mendeprekasi Node 20 dan
+      # mengeluarkan peringatan EBADENGINE saat build.
+      - key: NODE_VERSION
+        value: "22"
+
+      # Harus lebih longgar dari 3 x AI_TIMEOUT_MS di pitchku-ai (3 x 45 detik),
+      # karena tiap tahap di sana dicoba sampai tiga kali. Kalau lebih ketat,
+      # backend menyerah sementara pitchku-ai masih bekerja - token terbakar
+      # tanpa hasil.
+      - key: AI_TIMEOUT_MS
+        value: "150000"
+
+      # Label cadangan untuk generation_logs kalau pitchku-ai tidak
+      # menyebutkan nama model yang dipakai.
+      - key: LLM_MODEL
+        value: gemini-2.0-flash
+
+      # ---- Wajib diisi manual di dashboard Render ----
+      # Tanpa SUPABASE_URL dan satu kunci publik, server menolak start dan
+      # deploy gagal. Itu memang disengaja - lihat need() di src/env.js.
+      - key: SUPABASE_URL
+        sync: false
+
+      # Kalau proyek Supabase kamu memakai nama baru (sb_publishable_... dan
+      # sb_secret_...), hapus dua key di bawah dan ganti namanya jadi
+      # SUPABASE_PUBLISHABLE_KEY dan SUPABASE_SECRET_KEY. Kode menerima
+      # kedua gaya penamaan.
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      # Dipakai menulis generation_logs (melewati RLS).
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # URL service pitchku-ai, TANPA garis miring di akhir.
+      # Contoh: https://pitchku-ai.onrender.com
+      - key: AI_SERVICE_URL
+        sync: false
+
+      # Kunci antar-service. WAJIB sama persis dengan INTERNAL_API_KEY
+      # di service pitchku-ai, kalau tidak semua panggilan dibalas 401.
+      - key: INTERNAL_API_KEY
+        sync: false
+
+      # Domain frontend, contoh: https://pitchku.vercel.app
+      # Beberapa domain dipisah koma.
+      - key: CORS_ORIGIN
+        sync: false
+
+      # URL backend ini sendiri, supaya "Try it out" di /docs tidak
+      # menembak localhost. Contoh: https://pitchku-backend.onrender.com
+      - key: PUBLIC_URL
+        sync: false
