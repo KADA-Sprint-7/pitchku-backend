@@ -17,7 +17,9 @@ async function logGeneration(row) {
     await adminClient().from("generation_logs").insert({
       project_id: row.projectId ?? null,
       stage: row.stage,
-      model_name: env.llmModel,
+      // Nama model datang dari pitchku-ai, karena di sanalah model dipilih.
+      // env.llmModel hanya cadangan kalau balasannya tidak menyebutkannya.
+      model_name: row.model ?? env.llmModel,
       prompt_tokens: row.promptTokens ?? 0,
       completion_tokens: row.completionTokens ?? 0,
       duration_ms: row.durationMs,
@@ -68,6 +70,10 @@ generateRouter.post("/diagnose", requireAuth, async (req, res) => {
   } catch (e) {
     await logGeneration({
       stage: "diagnose",
+      // Token yang sudah terbakar di pitchku-ai walau hasilnya gagal.
+      // Kuota tetap habis, jadi tetap dicatat.
+      ...(e?.usage ?? {}),
+      cost: estimateCost(e?.usage),
       durationMs: Date.now() - t0,
       status: "failed",
       error: e?.message,
@@ -100,6 +106,8 @@ generateRouter.post("/outline", requireAuth, async (req, res) => {
   } catch (e) {
     await logGeneration({
       stage: "outline",
+      ...(e?.usage ?? {}),
+      cost: estimateCost(e?.usage),
       durationMs: Date.now() - t0,
       status: "failed",
       error: e?.message,
@@ -140,6 +148,8 @@ generateRouter.post("/slides", requireAuth, async (req, res) => {
   } catch (e) {
     await logGeneration({
       stage: "content",
+      ...(e?.usage ?? {}),
+      cost: estimateCost(e?.usage),
       durationMs: Date.now() - t0,
       status: "failed",
       error: e?.message,

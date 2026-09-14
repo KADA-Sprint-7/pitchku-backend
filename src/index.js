@@ -10,7 +10,18 @@ const { projectsRouter } = require("./routes/projects");
 
 const app = express();
 
-app.use(cors({ origin: env.corsOrigin.split(","), credentials: true }));
+/**
+ * trim() wajib di sini. Di dashboard Render orang biasa menulis
+ * "https://a.vercel.app, https://b.vercel.app" dengan spasi setelah koma,
+ * dan origin yang berawal spasi tidak akan pernah cocok - hasilnya error
+ * CORS yang membingungkan padahal domainnya sudah benar.
+ */
+const allowedOrigins = env.corsOrigin
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 
 const openApiDoc = buildOpenApiDoc();
