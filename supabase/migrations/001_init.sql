@@ -12,16 +12,23 @@ create table public.profiles (
 );
 
 -- Profil dibuat otomatis saat pengguna mendaftar, termasuk via Google OAuth.
+--
+-- raw_user_meta_data diisi frontend lewat signUp({ options: { data: {...} } }).
+-- Untuk pendaftaran email/password, kirim full_name dan company_name di sana;
+-- tanpa itu kolomnya null dan pengguna harus melengkapinya di halaman pengaturan.
+-- Google OAuth tidak pernah mengirim company_name - Google tidak tahu nama
+-- usaha seseorang - jadi kolom itu memang null sampai pengguna mengisi sendiri.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, full_name)
+  insert into public.profiles (id, full_name, company_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name')
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name'),
+    nullif(trim(new.raw_user_meta_data->>'company_name'), '')
   );
   return new;
 end;

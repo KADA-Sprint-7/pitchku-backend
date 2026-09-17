@@ -47,6 +47,20 @@ Kalau ada tabel bertanda "RLS not enabled", berarti SQL-nya belum jalan penuh.
 - **Confirm email: matikan dulu** selama development, biar tidak perlu
   buka email tiap bikin akun tes. Nyalakan lagi sebelum UAT.
 
+### Cek setelannya tanpa membuka dashboard
+
+```bash
+curl -s "https://<REF>.supabase.co/auth/v1/settings" -H "apikey: <ANON_KEY>"
+```
+
+Tiga field yang menentukan apakah login bisa jalan:
+
+| Field | Arti kalau nilainya begini |
+|---|---|
+| `"email": true` | login email/password aktif - ini yang benar |
+| `"mailer_autoconfirm": false` | Confirm email **masih menyala**. Akun baru tidak bisa masuk sampai tautan di emailnya diklik. Inilah penyebab paling sering keluhan "sudah daftar tapi tetap tidak bisa login". |
+| `"google": false` | tombol "Masuk dengan Google" pasti gagal - providernya belum diaktifkan di langkah 5 |
+
 ---
 
 ## 5. Google OAuth
@@ -154,14 +168,30 @@ export const supabase = createClient(
 
 Frontend cukup pakai `anon` key. Jangan pakai `service_role`.
 
-### Login
+### Daftar dan masuk
+
+Formulir pendaftaran meminta lima hal: nama lengkap, nama usaha, email usaha,
+kata sandi, dan konfirmasi kata sandi. Supabase hanya menerima `email` dan
+`password`; dua nama itu dikirim sebagai **metadata**, dan konfirmasi kata
+sandi dicocokkan di frontend saja - tidak ada gunanya dikirim ke mana pun.
 
 ```js
-// Email + password
-await supabase.auth.signUp({ email, password });
+// Daftar
+// full_name dan company_name disalin ke tabel profiles oleh trigger
+// on_auth_user_created. Frontend tidak perlu (dan tidak boleh) insert
+// ke profiles sendiri - RLS akan menolaknya.
+await supabase.auth.signUp({
+  email,
+  password,
+  options: { data: { full_name: fullName, company_name: companyName } },
+});
+
+// Masuk
 await supabase.auth.signInWithPassword({ email, password });
 
 // Google
+// Tidak membawa company_name - Google tidak tahu nama usaha seseorang.
+// Minta pengguna melengkapinya sekali di halaman pengaturan.
 await supabase.auth.signInWithOAuth({
   provider: "google",
   options: { redirectTo: `${location.origin}/dashboard` },
@@ -170,6 +200,12 @@ await supabase.auth.signInWithOAuth({
 // Keluar
 await supabase.auth.signOut();
 ```
+
+> Tidak ada endpoint `/api/auth/login` di backend, dan itu disengaja.
+> Kalau login diproksikan lewat backend, yang kembali cuma string token,
+> sementara klien `supabase-js` di frontend tidak ikut tahu - auto-refresh
+> token dan `onAuthStateChange` jadi mati. Backend hanya memverifikasi
+> token yang sudah jadi.
 
 ### Memanggil backend
 
