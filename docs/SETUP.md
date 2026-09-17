@@ -39,6 +39,16 @@ Kalau berhasil, cek **Table Editor**. Harus ada 5 tabel: `profiles`,
 Cek juga **Authentication** > **Policies** — tiap tabel harus punya policy.
 Kalau ada tabel bertanda "RLS not enabled", berarti SQL-nya belum jalan penuh.
 
+Setelah itu jalankan juga `supabase/migrations/002_fix_profiles.sql` dengan
+cara yang sama. Hasil Run terakhirnya harus `trigger_aktif = true` dan
+`user_tanpa_profil = 0`.
+
+> Kenapa perlu: `projects.user_id` menunjuk ke `profiles`, dan row `profiles`
+> hanya dibuat trigger saat pendaftaran. Akun yang dibuat **sebelum** migrasi
+> dijalankan tidak punya profil, jadi simpan proyek gagal dengan
+> `23503 ... projects_user_id_fkey`. Berkas `002` membuat ulang trigger dan
+> mengisi profil yang hilang, dan aman dijalankan berkali-kali.
+
 ## 4. Aktifkan login email/password
 
 **Authentication** > **Sign In / Providers** > **Email**
@@ -110,29 +120,37 @@ Copy dulu, sebentar lagi dipakai.
 Balik ke **Authentication** > **Sign In / Providers** > **Google**
 
 - Enable Sign in with Google: **on**
-- Client ID: tempel
-- Client Secret: tempel
+- Client IDs: tempel Client ID dari langkah 5b. Satu saja, tanpa koma.
+  Tombol Save menolak kalau ini kosong, jadi kerjakan 5b dulu.
+- Client Secret (for OAuth): tempel
+- Skip nonce checks dan Allow users without an email: **biarkan off**
 - **Save**
 
 ### 5d. Atur redirect setelah login
 
 **Authentication** > **URL Configuration**
 
-- Site URL: `http://localhost:3000`
+Frontend memakai Vite, jadi lokalnya jalan di port **5173**, bukan 3000.
+
+- Site URL: `http://localhost:5173`
 - Redirect URLs, tambahkan:
   ```
-  http://localhost:3000/**
+  http://localhost:5173/**
   ```
-  Nanti sebelum rilis, tambahkan juga alamat produksinya.
+  Frontend meminta kembali ke `/dashboard` setelah login Google. Kalau alamat
+  itu tidak cocok dengan daftar ini, Supabase diam-diam melempar pengguna ke
+  Site URL. Tambahkan juga alamat produksinya, `https://pitchku.vercel.app/**`.
 
 ### Kalau Google OAuth gagal
 
 | Gejala | Penyebab tersering |
 |---|---|
+| `Unsupported provider: missing OAuth secret` | Client Secret di Supabase kosong. Supabase membolehkan Save hanya dengan Client IDs, tapi login lewat tombol butuh secret. Google hanya menampilkan secret sekali saat dibuat; kalau tidak sempat dicopy, buka client-nya di Google Cloud lalu **Add secret** untuk membuat yang baru. |
+| `Error 401: deleted_client` | OAuth client yang Client ID-nya tersimpan di Supabase sudah dihapus di Google Cloud. Buat client baru (langkah 5b), lalu ganti **Client IDs dan Client Secret** di Supabase - secret saja tidak cukup. |
 | `redirect_uri_mismatch` | URI di Google Cloud tidak sama persis dengan callback Supabase. Cek trailing slash. |
 | `Access blocked: app not verified` | Email belum didaftarkan sebagai Test user (langkah 5.4) |
 | Login sukses tapi balik ke halaman kosong | Redirect URL belum didaftarkan di URL Configuration |
-| Login sukses tapi `profiles` kosong | Trigger `on_auth_user_created` belum jalan. Jalankan ulang migrasi. |
+| Login sukses tapi `profiles` kosong | Akunnya dibuat sebelum trigger `on_auth_user_created` ada. Jalankan `002_fix_profiles.sql` - bukan `001`, yang gagal kalau dijalankan ulang. |
 
 ---
 

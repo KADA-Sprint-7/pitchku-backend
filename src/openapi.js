@@ -233,6 +233,9 @@ registry.registerPath({
   path: "/api/projects",
   tags: ["Proyek"],
   summary: "Simpan deck sebagai versi baru",
+  description:
+    "deckId boleh dibuat frontend sendiri (UUID). Kalau proyek dengan id itu " +
+    "belum ada, proyeknya dibuat dulu. Tanpa deckId, backend membuat id baru.",
   security: auth,
   request: { body: json(DeckPayload) },
   responses: {
@@ -241,6 +244,7 @@ registry.registerPath({
       ...json(z.object({ projectId: z.string().uuid(), versionNumber: z.number() })),
     },
     401: { description: "Belum login", ...json(ErrorBody) },
+    409: { description: "deckId sudah dipakai proyek pengguna lain", ...json(ErrorBody) },
   },
 });
 

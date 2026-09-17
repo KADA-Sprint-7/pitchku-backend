@@ -33,11 +33,28 @@ projectsRouter.post("/", requireAuth, async (req, res) => {
   const d = parsed.data;
   const db = req.db;
 
+  // Frontend membuat UUID proyek sendiri (crypto.randomUUID) sejak wizard,
+  // lalu langsung mengirimnya sebagai deckId. Jadi deckId yang belum ada di
+  // database berarti proyek baru, bukan alamat yang salah. Kalau tidak dibuat
+  // di sini, insert deck_versions di bawah ditolak RLS karena proyeknya tidak
+  // ditemukan.
   let projectId = d.deckId;
-  if (!projectId) {
+  let exists = false;
+  if (projectId) {
+    const { data, error } = await db
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    exists = Boolean(data);
+  }
+
+  if (!exists) {
     const { data, error } = await db
       .from("projects")
       .insert({
+        ...(projectId && { id: projectId }),
         user_id: req.userId,
         title: d.businessName,
         template_type: d.template,
@@ -45,6 +62,12 @@ projectsRouter.post("/", requireAuth, async (req, res) => {
       })
       .select("id")
       .single();
+    // RLS menyembunyikan proyek milik orang lain dari select di atas, jadi
+    // deckId milik pengguna lain baru ketahuan di sini sebagai primary key
+    // yang bentrok.
+    if (error?.code === "23505") {
+      return res.status(409).json({ error: "deckId sudah dipakai proyek lain" });
+    }
     if (error) return res.status(500).json({ error: error.message });
     projectId = data.id;
   }
