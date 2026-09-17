@@ -103,6 +103,8 @@ src/
 ├── services/
 │   ├── ai.js             tiga tahap generasi + checklist template  [Rifka]
 │   └── pptx.js           mesin ekspor, koordinat inci 6 layout     [Risfa]
+│                         desainnya mengikuti kanvas editor di
+│                         pitchku-frontend, lihat catatan di bawah
 └── routes/
     ├── generate.js
     ├── brandKit.js
@@ -117,6 +119,45 @@ tiga orang sekaligus.
 Karena pakai JavaScript, kontrak ini menjaga bentuk data saat runtime tapi
 tidak memberi autocomplete di editor. Daffa bisa membangkitkan tipe dari
 `/openapi.json` kalau butuh.
+
+---
+
+## Desain slide mengikuti frontend
+
+Dulu `pptx.js` punya desainnya sendiri (latar putih, judul warna primer), jadi
+berkas unduhan kelihatan seperti presentasi lain dari yang dilihat pengguna di
+editor. Sekarang sumber desainnya satu: **kanvas editor di `pitchku-frontend`**,
+yaitu `src/components/SlideEditor/SlideLayoutRenderer.jsx` dan `SlideCanvas.jsx`.
+
+Kanvas web itu berukuran tetap 960 x 540 px dan slide PPTX 16:9 berukuran
+10 x 5.625 inci, jadi konversinya bulat: **96 px = 1 inci**, **1 px = 0.75 pt**.
+Di `pptx.js` konversi itu jadi dua fungsi kecil, `px()` dan `pt()`, dan hampir
+semua angka layout ditulis dalam satuan px kanvas supaya bisa dicocokkan
+langsung dengan kelas Tailwind di renderer.
+
+Yang ikut disalin: latar `#070C15`, kartu `#0F1A2E` dengan border `#1E293B`,
+badge "BAB 01 • COVER" di kiri atas, logo di kanan atas (tidak muncul di
+cover), bar footer berisi judul deck dan nomor slide, garis aksen di atas tiap
+judul, serta enam layout dengan susunan yang sama.
+
+Ada dua hal yang sengaja **tidak** persis sama:
+
+1. **Warna merek yang gelap dicerahkan** untuk teks kecil dan garis tipis di
+   atas latar gelap (fungsi `onDark`). Primary `#0F4C81` di atas `#070C15`
+   nyaris tidak terbaca, dan PPTX sering diproyeksikan, tidak bisa di-zoom
+   seperti di aplikasi. Warna isian kartu dan badge tetap memakai warna asli.
+2. **Gambar diambil lebih dulu** oleh backend dengan batas waktu 6 detik dan
+   ukuran 5 MB, lalu ditanam sebagai data URI. Kalau URL-nya mati, slide itu
+   jatuh ke kotak placeholder gelap seperti di editor, dan ekspor tetap jadi.
+
+Font memakai `brandKit.fontFamily` (default Inter) seperti di editor. Inter
+bukan font bawaan Windows, jadi kalau pengguna belum memasangnya PowerPoint
+akan menggantinya sendiri — kotak teksnya sudah dikasih ruang lebih supaya
+pergantian font itu tidak bikin teks meluber.
+
+Kalau renderer di frontend berubah, `pptx.js` harus ikut diubah. Tidak ada tes
+yang menangkap ini otomatis; cara cek tercepat masih `npm run smoke` lalu buka
+`contoh-hasil.pptx` dan bandingkan dengan editor.
 
 ---
 
@@ -142,13 +183,16 @@ Hasil `npm run smoke` sebelum kode ini diserahkan:
 
 - Skema `DeckPayload` lolos untuk payload 6 slide
 - Judul 80 karakter **ditolak** skema (batas 60 ditegakkan, bukan cuma diminta ke LLM)
-- Ekspor PPTX 6 slide berhasil, ~108 KB, magic bytes ZIP valid
+- Ekspor PPTX 6 slide berhasil, ~133 KB, magic bytes ZIP valid
 - 8 endpoint terdokumentasi di Swagger, `/docs` merespons 200
 - Endpoint tanpa token dan dengan token ngawur sama-sama 401
 
-Berkas hasilnya juga dibongkar dan diperiksa isinya: **11 objek teks native,
-17 shape native, 0 gambar**. Ini bukti syarat mutlak FRD terpenuhi — slide
+Berkas hasilnya juga dibongkar dan diperiksa isinya: **60 kotak teks native,
+43 shape native, 0 gambar**. Ini bukti syarat mutlak FRD terpenuhi — slide
 bukan gambar tempelan, teksnya bisa diklik dan disunting di PowerPoint.
+
+Keenam slide juga dibuka di PowerPoint dan diekspor jadi PNG untuk
+dibandingkan dengan tampilan editor.
 
 ---
 

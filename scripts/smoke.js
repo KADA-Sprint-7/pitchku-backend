@@ -11,6 +11,7 @@ const { DeckPayload } = require("../src/schemas/slide");
 const sample = {
   template: "penawaran_produk",
   businessName: "Keripik Bu Tini",
+  deckTitle: "Penawaran Keripik Bu Tini 2026",
   brandKit: { primaryColor: "#0F4C81", accentColor: "#F2A007", fontFamily: "Inter" },
   slides: [
     { slideNumber: 1, layout: "title_slide", title: "Penawaran Keripik Singkong Premium",
@@ -35,7 +36,10 @@ const sample = {
               { header: "Paket rutin", description: "200 bungkus per bulan, lebih murah 8%" }] },
     { slideNumber: 6, layout: "contact_closing", title: "Mari mulai kerja sama",
       subtitle: "Kami siap kirim sampel gratis minggu ini",
-      bullets: ["WhatsApp 0812-3456-7890", "keripikbutini@gmail.com", "Instagram @keripikbutini"] },
+      cards: [{ header: "WhatsApp", description: "0812-3456-7890" },
+              { header: "Email", description: "keripikbutini@gmail.com" },
+              { header: "Instagram", description: "@keripikbutini" },
+              { header: "Alamat", description: "Cikarang Utara, Bekasi" }] },
   ],
 };
 
@@ -54,6 +58,7 @@ const sample = {
     slides: parsed.data.slides,
     brandKit: parsed.data.brandKit,
     businessName: parsed.data.businessName,
+    deckTitle: parsed.data.deckTitle,
   });
   const out = path.join(__dirname, "..", "contoh-hasil.pptx");
   fs.writeFileSync(out, buf);

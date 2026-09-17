@@ -232,6 +232,9 @@ const res = await fetch(`${API}/api/export/pptx`, {
   body: JSON.stringify({
     template: ctx.template,
     businessName: ctx.businessName,
+    // Opsional. Dipakai di footer tiap slide, sama seperti footer kanvas
+    // editor. Kalau kosong, footer memakai businessName.
+    deckTitle: "Penawaran Keripik Bu Tini 2026",
     brandKit: { primaryColor: "#0F4C81", accentColor: "#F2A007" },
     slides,
   }),

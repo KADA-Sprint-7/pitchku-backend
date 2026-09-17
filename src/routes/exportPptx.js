@@ -16,9 +16,9 @@ exportRouter.post("/pptx", requireAuth, async (req, res) => {
     });
   }
 
-  const { slides, brandKit, businessName, template } = parsed.data;
+  const { slides, brandKit, businessName, deckTitle, template } = parsed.data;
   try {
-    const buf = await renderPptx({ slides, brandKit, businessName });
+    const buf = await renderPptx({ slides, brandKit, businessName, deckTitle });
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation"

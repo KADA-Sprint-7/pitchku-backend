@@ -92,6 +92,13 @@ const DeckPayload = z
     deckId: z.string().uuid().optional(),
     template: TemplateId,
     businessName: z.string().min(2).max(150),
+    /**
+     * Judul deck yang dipakai di footer slide, sama seperti footer kanvas
+     * editor. Kalau tidak dikirim, footer memakai businessName.
+     */
+    deckTitle: z.string().max(150).optional().openapi({
+      example: "Penawaran Keripik Bu Tini 2026",
+    }),
     brandKit: BrandKit,
     slides: z.array(Slide).min(3).max(12),
   })

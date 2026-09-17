@@ -282,7 +282,9 @@ registry.registerPath({
   description:
     "Mengembalikan berkas .pptx. Teks jadi objek teks native dan kartu jadi " +
     "shape native, BUKAN gambar tempelan — ini syarat mutlak dari FRD. " +
-    "Konversi murni di memori tanpa menulis berkas fisik ke disk server.",
+    "Konversi murni di memori tanpa menulis berkas fisik ke disk server. " +
+    "Desain slide mengikuti kanvas editor di pitchku-frontend (tema gelap, " +
+    "badge bab, footer judul deck dan nomor slide).",
   security: auth,
   request: { body: json(DeckPayload) },
   responses: {
