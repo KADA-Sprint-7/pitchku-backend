@@ -106,13 +106,20 @@ function buildGoal(ctx, outline) {
       ...outline.map((o, i) => `${i + 1}. ${o.title}${o.objective ? " - " + o.objective : ""}`)
     );
   }
+  // Format poin menentukan layout di editor (lihat toEditorSlide). Tanpa
+  // pembedaan per jenis slide, model memakai "Label: isi" di semua slide dan
+  // seluruh deck jadi card_grid.
   lines.push(
     "",
     "Aturan tambahan dari editor PitchKu:",
     `- judul slide maksimal ${LIMITS.title} karakter, subtitle maksimal ${LIMITS.subtitle} karakter`,
     `- maksimal ${LIMITS.bulletCount} poin content per slide, tiap poin maksimal ${LIMITS.bullet} karakter`,
-    `- untuk daftar produk, keunggulan, angka, atau kontak, tulis tiap poin dengan format "Label: isi", label maksimal ${LIMITS.cardHeader} karakter`,
-    '- slide terakhir berisi ajakan dan kontak dari materi dengan format seperti "WhatsApp: 0812...", jangan mengarang nomor atau alamat',
+    "- format poin content menentukan tampilan slide, jadi ikuti sesuai jenis slide:",
+    `  - produk, layanan, harga, atau keunggulan: 3-4 poin "Label: isi", label maksimal ${LIMITS.cardHeader} karakter`,
+    '  - angka, capaian, atau kondisi usaha: 3-4 poin "ANGKA: keterangan" dengan angka di depan, misalnya "800 bungkus: kapasitas per minggu"',
+    '  - perbandingan dua hal: tepat 2 poin "Label: isi"',
+    "  - latar belakang, peluang, target, strategi, rencana: 3-5 kalimat biasa TANPA titik dua",
+    '  - slide terakhir: ajakan singkat di subtitle, lalu HANYA poin kontak dari materi seperti "WhatsApp: 0812...". Jangan mengarang nomor atau alamat',
     "- pakai angka nyata dari materi, jangan mengarang angka atau harga"
   );
   return lines.filter((l, i, all) => l !== "" || all[i - 1] !== "").join("\n");
@@ -201,11 +208,16 @@ function recall(ctx) {
 /* ------------------------------------------------------------------ */
 
 const IMAGE_VISUALS = new Set(["stock_image", "illustration"]);
-const NUMBERISH = /^(rp\s?)?[\d.,]+\s?(%|\+|x|rb|ribu|jt|juta|k|m)?\+?$/i;
+// "150+", "Rp25rb", "30%", "800 bungkus", "350 pelanggan tetap"
+const NUMBERISH = /^(rp\s?)?[\d.,]+\s?(%|\+|x)?(\s?[a-z]{1,12}){0,2}\+?$/i;
+const CONTACTISH =
+  /(whats\s?app|^wa\b|instagram|^ig\b|e-?mail|telepon|telp|^hp\b|alamat|lokasi|website|situs|tokopedia|shopee|tiktok|facebook|line|telegram|youtube)/i;
 
 function cardOf(line) {
   const m = /^([^:]{1,30}):\s*(.+)$/.exec(line);
-  return m ? { header: m[1].trim(), description: cut(m[2], LIMITS.cardDesc) } : null;
+  if (!m) return null;
+  const description = cut(m[2], LIMITS.cardDesc);
+  return { header: m[1].trim(), description: description.charAt(0).toUpperCase() + description.slice(1) };
 }
 
 /**
@@ -231,7 +243,13 @@ function toEditorSlide(raw, index, total, title) {
   const cards = raw.content.map(cardOf);
   if (cards.length >= 2 && cards.every(Boolean)) {
     if (index === total - 1) {
-      return { ...base, layout: "contact_closing", cards: cards.slice(0, LIMITS.cardCount) };
+      // Model kadang menyelipkan ringkasan penawaran di antara kontak.
+      const contacts = cards.filter((c) => CONTACTISH.test(c.header));
+      return {
+        ...base,
+        layout: "contact_closing",
+        cards: (contacts.length ? contacts : cards).slice(0, LIMITS.cardCount),
+      };
     }
     if (cards.length === 2) return { ...base, layout: "two_column", cards };
     const numeric = cards.every((c) => NUMBERISH.test(c.header));
