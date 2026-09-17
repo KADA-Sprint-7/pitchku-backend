@@ -13,17 +13,15 @@ services:
       - key: NODE_VERSION
         value: "22"
 
-      # Harus lebih longgar dari 3 x AI_TIMEOUT_MS di pitchku-ai (3 x 45 detik),
-      # karena tiap tahap di sana dicoba sampai tiga kali. Kalau lebih ketat,
-      # backend menyerah sementara pitchku-ai masih bekerja - token terbakar
-      # tanpa hasil.
+      # Satu deck 10 slide dibuat dalam satu panggilan ke pitchku-ai, dan
+      # model lokal lewat Ollama bisa butuh beberapa menit.
       - key: AI_TIMEOUT_MS
-        value: "150000"
+        value: "180000"
 
-      # Label cadangan untuk generation_logs kalau pitchku-ai tidak
-      # menyebutkan nama model yang dipakai.
+      # Label model di generation_logs. pitchku-ai tidak menyebutkan model
+      # yang dipakai, jadi tulis sesuai OLLAMA_MODEL di sana.
       - key: LLM_MODEL
-        value: gemini-2.0-flash
+        value: pitchku-ai
 
       # ---- Wajib diisi manual di dashboard Render ----
       # Tanpa SUPABASE_URL dan satu kunci publik, server menolak start dan
@@ -41,13 +39,14 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
 
-      # URL service pitchku-ai, TANPA garis miring di akhir.
+      # URL service pitchku-ai, TANPA garis miring di akhir. Backend memanggil
+      # {AI_SERVICE_URL}/api/v1/decks/generate.
       # Contoh: https://pitchku-ai.onrender.com
       - key: AI_SERVICE_URL
         sync: false
 
-      # Kunci antar-service. WAJIB sama persis dengan INTERNAL_API_KEY
-      # di service pitchku-ai, kalau tidak semua panggilan dibalas 401.
+      # Opsional. Dikirim sebagai header x-internal-key; pitchku-ai saat ini
+      # belum memeriksanya.
       - key: INTERNAL_API_KEY
         sync: false
 

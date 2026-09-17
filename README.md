@@ -8,7 +8,7 @@ API untuk PitchKu — pembuat presentasi bisnis untuk UMKM Indonesia.
 | Peran | Orang | Repo |
 |---|---|---|
 | Backend | Risfa | repo ini |
-| AI Engine | Rifka | `src/services/ai.js` di repo ini |
+| AI Engine | Rifka | `pitchku-ai`, dipanggil lewat `src/services/ai.js` |
 | Frontend | Daffa | `pitchku-frontend` |
 
 Urutan integrasi: backend + AI dulu (machine-to-machine), frontend menyusul.
@@ -51,7 +51,7 @@ kode yang perlu Daffa pakai di frontend.
 | POST | `/api/generate/outline` | **Tahap 1** — kerangka slide |
 | POST | `/api/generate/slides` | **Tahap 2** — isi slide |
 | GET | `/api/brand-kit` | Ambil brand kit |
-| PUT | `/api/brand-kit` | Simpan warna dan logo |
+| POST / PUT | `/api/brand-kit` | Simpan warna dan logo |
 | GET | `/api/projects` | Daftar deck |
 | POST | `/api/projects` | Simpan deck sebagai versi baru |
 | GET | `/api/projects/:id` | Buka versi terbaru |
@@ -76,16 +76,30 @@ mau bikin apa.
 dibuat. Memperbaiki di tahap ini jauh lebih murah daripada mengulang seluruh
 deck.
 
-**Tahap 2 — Isi.** Konten lengkap, divalidasi terhadap skema kanonik, retry
-otomatis maksimal 2 kali kalau JSON-nya tidak lolos.
+**Tahap 2 — Isi.** Konten lengkap mengikuti kerangka yang sudah disunting
+pengguna, divalidasi terhadap skema kanonik.
 
-Setiap slide juga membawa field `missing`: hal yang lazim wajib ada di jenis
-dokumen itu tapi belum disebut pengguna. Frontend menampilkannya sebagai saran,
-misalnya "Margin reseller belum disebut".
+### Hubungan dengan pitchku-ai
 
-Pengetahuan bisnis per template ada di `TEMPLATE_INFO` di `src/services/ai.js`.
-Itu satu tempat yang paling layak diperbaiki setelah UAT — kalau pemilik usaha
-bilang ada hal penting yang selalu terlewat, tambahkan ke checklist di situ.
+AI berjalan di service terpisah, `pitchku-ai` (repo Rifka), yang menyediakan
+satu endpoint: `POST /api/v1/decks/generate` dengan body `{ business, goal }`,
+membalas 10 slide berbentuk `{ title, subtitle, content[], visual }`.
+`src/services/ai.js` menjembatani endpoint itu dengan tiga tahap di atas:
+
+| Tahap | Sumber |
+|---|---|
+| Diagnosa | Aturan kata kunci di backend. pitchku-ai belum punya endpoint diagnosa. |
+| Kerangka | Satu deck dibuat di pitchku-ai; judul slide-nya jadi kerangka. Deck disimpan di memori selama 1 jam. |
+| Isi | Deck dari tahap kerangka diubah ke bentuk editor. Kalau tidak ada di memori (server restart), pitchku-ai dipanggil lagi dengan kerangka pengguna. |
+
+Layout dipilih dari isi slide: poin berformat `Label: isi` jadi kartu
+(`two_column`, `card_grid`, atau `metrics_grid` kalau labelnya angka), slide
+pertama jadi sampul, dan slide terakhir berisi kontak jadi `contact_closing`.
+Supaya itu terjadi, backend meminta format tersebut lewat field `goal`.
+
+Pengetahuan bisnis per template ada di `TEMPLATE_INFO` di `src/services/ai.js`,
+dikirim ke pitchku-ai sebagai bagian dari `goal`. Kalau pemilik usaha bilang
+ada hal penting yang selalu terlewat, tambahkan ke checklist di situ.
 
 ---
 

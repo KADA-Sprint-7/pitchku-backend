@@ -41,24 +41,26 @@ const env = {
 
   /* ---- pitchku-ai ---- */
 
-  aiServiceUrl: (process.env.AI_SERVICE_URL ?? "http://localhost:4001").replace(
-    /\/$/,
-    ""
-  ),
+  /*
+   * optional() dipakai, bukan `??`. Baris kosong seperti "AI_TIMEOUT_MS=" di
+   * .env menghasilkan string kosong, dan Number("") = 0 membuat setiap
+   * panggilan AI langsung dibatalkan.
+   */
 
-  /** Kunci bersama dengan INTERNAL_API_KEY di pitchku-ai. */
-  internalApiKey: process.env.INTERNAL_API_KEY ?? "",
+  /** Alamat service pitchku-ai, tanpa garis miring di akhir. */
+  aiServiceUrl: (optional("AI_SERVICE_URL") || "http://localhost:4001").replace(/\/$/, ""),
+
+  /** Dikirim sebagai x-internal-key. pitchku-ai saat ini belum memeriksanya. */
+  internalApiKey: optional("INTERNAL_API_KEY"),
 
   /**
-   * Harus lebih longgar daripada AI_TIMEOUT_MS x 3 di pitchku-ai, karena
-   * di sana satu permintaan bisa dicoba sampai tiga kali. Kalau lebih ketat,
-   * backend menyerah sementara pitchku-ai masih bekerja - token terbakar
-   * tanpa hasil. Lihat DEPLOY.md soal batas waktu di Render.
+   * Satu deck dibuat dalam satu panggilan ke /api/v1/decks/generate, dan
+   * model lokal lewat Ollama bisa butuh beberapa menit untuk 10 slide.
    */
-  aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS ?? 150000),
+  aiTimeoutMs: Number(optional("AI_TIMEOUT_MS")) || 180000,
 
-  /** Dipakai sebagai label log kalau pitchku-ai tidak menyebut nama model. */
-  llmModel: process.env.LLM_MODEL ?? "gemini-2.0-flash",
+  /** Label model di generation_logs. pitchku-ai tidak menyebut model yang dipakai. */
+  llmModel: optional("LLM_MODEL") || "pitchku-ai",
 
   /** Nol = free tier. Lihat estimateCost() di services/ai.js. */
   pricePerMillionInput: Number(process.env.LLM_PRICE_INPUT_PER_1M ?? 0),

@@ -17,9 +17,9 @@ async function logGeneration(row) {
     await adminClient().from("generation_logs").insert({
       project_id: row.projectId ?? null,
       stage: row.stage,
-      // Nama model datang dari pitchku-ai, karena di sanalah model dipilih.
-      // env.llmModel hanya cadangan kalau balasannya tidak menyebutkannya.
-      model_name: row.model ?? env.llmModel,
+      // Label dari services/ai.js: LLM_MODEL untuk panggilan pitchku-ai,
+      // atau "aturan-kata-kunci" untuk diagnosa.
+      model_name: String(row.model ?? env.llmModel).slice(0, 50),
       prompt_tokens: row.promptTokens ?? 0,
       completion_tokens: row.completionTokens ?? 0,
       duration_ms: row.durationMs,
@@ -118,7 +118,19 @@ generateRouter.post("/outline", requireAuth, async (req, res) => {
 
 const SlidesBody = z.object({
   context: BusinessContext,
-  outline: z.array(OutlineItem).min(3).max(12),
+  // Kerangka sudah disunting pengguna di halaman outline: slide boleh
+  // ditambah atau dihapus, dan tujuan slide tidak dibatasi panjangnya di
+  // sana. Dipotong ke batas kontrak, bukan ditolak.
+  outline: z.preprocess(
+    (items) =>
+      Array.isArray(items)
+        ? items.map((o) => ({
+            title: String(o?.title ?? "").slice(0, 60),
+            objective: String(o?.objective ?? "").slice(0, 160),
+          }))
+        : items,
+    z.array(OutlineItem).min(1).max(15)
+  ),
 });
 
 /** TAHAP 2 — Isi slide */
