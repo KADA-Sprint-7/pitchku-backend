@@ -104,6 +104,83 @@ const DeckPayload = z
   })
   .openapi("DeckPayload");
 
+/* ------------------------------------------------------------------ */
+/* Deck kiriman editor (simpan & ekspor)                               */
+/*                                                                     */
+/* Editor di pitchku-frontend memotong semua teks ke 80 karakter        */
+/* (sanitizeDeckPayload), padahal batas judul 60 dan header kartu 30.    */
+/* Payload seperti itu dulu ditolak 400: proyek tidak tersimpan dan      */
+/* ekspor diam-diam jatuh ke pptxgenjs di browser. Di sini teks dipotong */
+/* ke batas kontrak, jadi tata letak PPTX tetap aman tanpa menolak       */
+/* pekerjaan pengguna. Jumlah slide juga dilonggarkan karena pengguna    */
+/* bebas menambah dan menghapus slide di editor.                         */
+/* ------------------------------------------------------------------ */
+
+const cut = (v, max) => (typeof v === "string" ? v.slice(0, max) : v);
+const blankToUndef = (v) =>
+  v == null || (typeof v === "string" && v.trim() === "") ? undefined : v;
+
+function validUrl(v) {
+  if (typeof v !== "string" || !v.trim()) return undefined;
+  try {
+    new URL(v.trim());
+    return v.trim();
+  } catch {
+    return undefined;
+  }
+}
+
+function clampSlide(s, idx) {
+  if (!s || typeof s !== "object") return s;
+  const texts = (arr, maxItems, maxLen) =>
+    Array.isArray(arr)
+      ? arr.slice(0, maxItems).map((t) => cut(String(t ?? ""), maxLen))
+      : undefined;
+  return {
+    ...s,
+    slideNumber:
+      Number.isInteger(s.slideNumber) && s.slideNumber > 0 ? s.slideNumber : idx + 1,
+    layout: LAYOUT_IDS.includes(s.layout) ? s.layout : "title_bullets",
+    title: cut(String(s.title ?? ""), LIMITS.title),
+    subtitle: cut(blankToUndef(s.subtitle), LIMITS.subtitle),
+    bullets: texts(s.bullets, LIMITS.bulletCount, LIMITS.bullet),
+    cards: Array.isArray(s.cards)
+      ? s.cards.slice(0, LIMITS.cardCount).map((c) => ({
+          header: cut(String(c?.header ?? ""), LIMITS.cardHeader),
+          description: cut(String(c?.description ?? ""), LIMITS.cardDesc),
+        }))
+      : undefined,
+    imageUrl: validUrl(s.imageUrl),
+    imageQuery: cut(blankToUndef(s.imageQuery), 80),
+    missing: texts(s.missing, 4, 120),
+  };
+}
+
+function clampDeck(raw) {
+  if (!raw || typeof raw !== "object") return raw;
+  const kit = raw.brandKit && typeof raw.brandKit === "object" ? raw.brandKit : {};
+  const name = typeof raw.businessName === "string" ? raw.businessName.trim() : "";
+  const font = typeof kit.fontFamily === "string" ? kit.fontFamily.trim() : "";
+  return {
+    ...raw,
+    template: TEMPLATE_IDS.includes(raw.template) ? raw.template : "company_profile",
+    businessName: cut(name.length >= 2 ? name : "Presentasi PitchKu", 150),
+    deckTitle: cut(blankToUndef(raw.deckTitle), 150),
+    brandKit: {
+      logoUrl: validUrl(kit.logoUrl) ?? null,
+      primaryColor: HEX.test(kit.primaryColor ?? "") ? kit.primaryColor : "#0F4C81",
+      accentColor: HEX.test(kit.accentColor ?? "") ? kit.accentColor : "#F2A007",
+      fontFamily: font ? font.slice(0, 50) : "Inter",
+    },
+    slides: Array.isArray(raw.slides) ? raw.slides.map(clampSlide) : raw.slides,
+  };
+}
+
+const DeckInput = z.preprocess(
+  clampDeck,
+  DeckPayload.extend({ slides: z.array(Slide).min(1).max(50) })
+);
+
 const OutlineItem = z
   .object({
     title: z.string().max(LIMITS.title),
@@ -183,6 +260,7 @@ module.exports = {
   Card,
   Slide,
   DeckPayload,
+  DeckInput,
   OutlineItem,
   BusinessContext,
   NeedInput,

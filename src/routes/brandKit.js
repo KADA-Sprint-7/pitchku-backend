@@ -29,7 +29,7 @@ brandKitRouter.get("/", requireAuth, async (req, res) => {
   });
 });
 
-brandKitRouter.put("/", requireAuth, async (req, res) => {
+async function saveBrandKit(req, res) {
   const parsed = BrandKit.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -51,6 +51,10 @@ brandKitRouter.put("/", requireAuth, async (req, res) => {
   );
   if (error) return res.status(500).json({ error: error.message });
   res.json(b);
-});
+}
+
+brandKitRouter.put("/", requireAuth, saveBrandKit);
+// saveBrandKitApi di frontend memakai POST.
+brandKitRouter.post("/", requireAuth, saveBrandKit);
 
 module.exports = { brandKitRouter };

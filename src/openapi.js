@@ -62,22 +62,26 @@ registry.registerPath({
   },
 });
 
-registry.registerPath({
-  method: "put",
-  path: "/api/brand-kit",
-  tags: ["Brand Kit"],
-  summary: "Simpan warna dan logo",
-  description:
-    "Satu pengguna hanya punya satu brand kit. Tabel brand_kits diberi " +
-    "UNIQUE (user_id) supaya tidak ada baris ganda tanpa penanda mana yang aktif.",
-  security: auth,
-  request: { body: json(BrandKit) },
-  responses: {
-    200: { description: "Tersimpan", ...json(BrandKit) },
-    400: { description: "Warna bukan HEX 6 digit", ...json(ErrorBody) },
-    401: { description: "Belum login", ...json(ErrorBody) },
-  },
-});
+for (const method of ["post", "put"]) {
+  registry.registerPath({
+    method,
+    path: "/api/brand-kit",
+    tags: ["Brand Kit"],
+    summary: "Simpan warna dan logo",
+    description:
+      "POST dan PUT sama persis; frontend memakai POST. Satu pengguna hanya " +
+      "punya satu brand kit. Tabel brand_kits diberi UNIQUE (user_id) supaya " +
+      "tidak ada baris ganda tanpa penanda mana yang aktif. logoUrl boleh " +
+      "berupa data URL base64.",
+    security: auth,
+    request: { body: json(BrandKit) },
+    responses: {
+      200: { description: "Tersimpan", ...json(BrandKit) },
+      400: { description: "Warna bukan HEX 6 digit", ...json(ErrorBody) },
+      401: { description: "Belum login", ...json(ErrorBody) },
+    },
+  });
+}
 
 
 /* ---------------- Tahap 0: diagnosa ---------------- */
@@ -218,8 +222,9 @@ registry.registerPath({
             id: z.string().uuid(),
             title: z.string(),
             templateType: TemplateId,
-            status: z.enum(["draft", "completed"]),
+            status: z.enum(["draft", "selesai"]),
             updatedAt: z.string(),
+            slideCount: z.number().int(),
           })
         )
       ),
@@ -235,10 +240,23 @@ registry.registerPath({
   summary: "Simpan deck sebagai versi baru",
   description:
     "deckId boleh dibuat frontend sendiri (UUID). Kalau proyek dengan id itu " +
-    "belum ada, proyeknya dibuat dulu. Tanpa deckId, backend membuat id baru.",
+    "belum ada, proyeknya dibuat dulu. Tanpa deckId, backend membuat id baru. " +
+    "Teks yang melebihi batas dipotong, bukan ditolak, dan jumlah slide boleh " +
+    "1-50. Kalau isinya sama dengan versi terakhir, tidak dibuat versi baru " +
+    "(200, unchanged: true).",
   security: auth,
   request: { body: json(DeckPayload) },
   responses: {
+    200: {
+      description: "Tidak ada perubahan sejak versi terakhir",
+      ...json(
+        z.object({
+          projectId: z.string().uuid(),
+          versionNumber: z.number(),
+          unchanged: z.literal(true),
+        })
+      ),
+    },
     201: {
       description: "Tersimpan",
       ...json(z.object({ projectId: z.string().uuid(), versionNumber: z.number() })),
@@ -256,7 +274,16 @@ registry.registerPath({
   security: auth,
   request: { params: z.object({ id: z.string().uuid() }) },
   responses: {
-    200: { description: "Isi deck", ...json(DeckPayload) },
+    200: {
+      description: "Isi deck",
+      ...json(
+        DeckPayload.extend({
+          title: z.string(),
+          status: z.enum(["draft", "selesai"]),
+          updatedAt: z.string(),
+        })
+      ),
+    },
     401: { description: "Belum login", ...json(ErrorBody) },
     404: { description: "Tidak ditemukan atau bukan milik Anda", ...json(ErrorBody) },
   },
@@ -270,7 +297,10 @@ registry.registerPath({
   security: auth,
   request: { params: z.object({ id: z.string().uuid() }) },
   responses: {
-    204: { description: "Terhapus" },
+    200: {
+      description: "Terhapus",
+      ...json(z.object({ success: z.literal(true), id: z.string().uuid() })),
+    },
     401: { description: "Belum login", ...json(ErrorBody) },
     404: { description: "Tidak ditemukan", ...json(ErrorBody) },
   },

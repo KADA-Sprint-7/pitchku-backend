@@ -43,6 +43,11 @@ Setelah itu jalankan juga `supabase/migrations/002_fix_profiles.sql` dengan
 cara yang sama. Hasil Run terakhirnya harus `trigger_aktif = true` dan
 `user_tanpa_profil = 0`.
 
+Lalu `supabase/migrations/003_status_selesai.sql`. Berkas ini mengganti
+status proyek jadi `draft` | `selesai` seperti di frontend, sekaligus
+mencatat 001 dan 002 sebagai sudah jalan supaya integrasi GitHub Supabase
+tidak mencoba menjalankannya lagi setiap push ke `master`.
+
 > Kenapa perlu: `projects.user_id` menunjuk ke `profiles`, dan row `profiles`
 > hanya dibuat trigger saat pendaftaran. Akun yang dibuat **sebelum** migrasi
 > dijalankan tidak punya profil, jadi simpan proyek gagal dengan

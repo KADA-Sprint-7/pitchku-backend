@@ -121,8 +121,20 @@ const filled = (arr) =>
 const IMG_TIMEOUT_MS = 6000;
 const IMG_MAX_BYTES = 5 * 1024 * 1024;
 
+const DATA_URL_IMAGE = /^data:(image\/(?:png|jpe?g|gif));base64,/i;
+
 async function fetchImage(url) {
-  if (!/^https?:\/\//i.test(String(url ?? ""))) return null;
+  const src = String(url ?? "");
+
+  // Logo dan gambar yang diunggah di editor berbentuk data URL, bukan tautan.
+  // Sudah siap tanam; cukup cek jenis dan ukurannya.
+  const inline = src.match(DATA_URL_IMAGE);
+  if (inline) {
+    const bytes = Math.floor(((src.length - inline[0].length) * 3) / 4);
+    return bytes > 0 && bytes <= IMG_MAX_BYTES ? src : null;
+  }
+
+  if (!/^https?:\/\//i.test(src)) return null;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), IMG_TIMEOUT_MS);
   try {

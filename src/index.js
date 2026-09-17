@@ -22,7 +22,27 @@ const allowedOrigins = env.corsOrigin
   .filter(Boolean);
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.use(express.json({ limit: "2mb" }));
+
+/**
+ * fetchApi di pitchku-frontend membaca pesan error dari field `message`,
+ * sedangkan semua route di sini mengirim `error`. Tanpa ini pengguna hanya
+ * melihat "API Error: Bad Request". Dipasang sebelum parser JSON supaya
+ * error body yang terlalu besar atau rusak juga ikut membawa pesan.
+ */
+app.use((_req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode >= 400 && body && typeof body === "object" && body.error && !body.message) {
+      body = { ...body, message: body.detail ? `${body.error}: ${body.detail}` : body.error };
+    }
+    return json(body);
+  };
+  next();
+});
+
+// Logo dan gambar unggahan editor dikirim sebagai data URL base64. Logo
+// dibatasi 2 MB di frontend, yang jadi sekitar 2,7 MB setelah base64.
+app.use(express.json({ limit: "10mb" }));
 
 const openApiDoc = buildOpenApiDoc();
 
@@ -43,6 +63,12 @@ app.use((_req, res) => res.status(404).json({ error: "Endpoint tidak ada" }));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
+  // Error dari parser body (JSON rusak, body terlalu besar) membawa status
+  // 4xx sendiri. Itu kesalahan permintaan, bukan kesalahan server.
+  const status = err?.status ?? err?.statusCode;
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ error: "Permintaan tidak valid", detail: err.message });
+  }
   console.error(err);
   res.status(500).json({ error: "Kesalahan server", detail: err?.message });
 });
