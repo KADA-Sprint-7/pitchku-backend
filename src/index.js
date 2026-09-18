@@ -46,6 +46,23 @@ app.use(express.json({ limit: "10mb" }));
 
 const openApiDoc = buildOpenApiDoc();
 
+/**
+ * Root sengaja tidak dibiarkan 404. Orang yang pertama kali diberi URL
+ * backend ini - penguji, juri, anggota tim baru - hampir selalu membuka
+ * domain polosnya lebih dulu, bukan /docs. Balasan 404 di situ terbaca
+ * seperti servernya mati, padahal hidup.
+ */
+app.get("/", (_req, res) =>
+  res.json({
+    message: "Hello, this is PitchKu backend",
+    service: "pitchku-backend",
+    version: "0.1.0",
+    docs: "/docs",
+    health: "/health",
+    openapi: "/openapi.json",
+  })
+);
+
 app.get("/health", (_req, res) => res.json({ ok: true, version: "0.1.0" }));
 app.get("/openapi.json", (_req, res) => res.json(openApiDoc));
 app.use(
