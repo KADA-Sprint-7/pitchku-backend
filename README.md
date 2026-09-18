@@ -1,42 +1,138 @@
-# PitchKu Backend
+<div align="center">
 
-API untuk PitchKu — pembuat presentasi bisnis untuk UMKM Indonesia.
+# PitchKu — Backend
 
-**Stack:** Express + JavaScript + Zod + Supabase + pptxgenjs
-**Dokumentasi API:** Swagger UI di `/docs`, dibangkitkan otomatis dari skema Zod
+**Pembuat presentasi bisnis ber-AI untuk UMKM Indonesia**
 
-| Peran | Orang | Repo |
-|---|---|---|
-| Backend | Risfa | repo ini |
-| AI Engine | Rifka | `pitchku-ai`, dipanggil lewat `src/services/ai.js` |
-| Frontend | Daffa | `pitchku-frontend` |
+[![Express](https://img.shields.io/badge/Express_5-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com)
+[![Node](https://img.shields.io/badge/Node_22-5FA04E?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Zod](https://img.shields.io/badge/Zod-3E67B1?style=for-the-badge&logo=zod&logoColor=white)](https://zod.dev)
+[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Swagger](https://img.shields.io/badge/OpenAPI-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](https://swagger.io)
 
-Urutan integrasi: backend + AI dulu (machine-to-machine), frontend menyusul.
+### [🖥️ Coba Aplikasinya](https://pitchku.vercel.app) · [📘 Dokumentasi API Interaktif](https://pitchku-backend-production.up.railway.app/docs)
+
+*Dokumentasi API bisa langsung dicoba dari browser lewat tombol "Try it out"*
+
+</div>
 
 ---
 
-## Jalanin lokal
+## Masalah yang dipecahkan
 
-```bash
-npm install
-cp .env.example .env     # isi kredensialnya, lihat docs/SETUP.md
-npm run dev
+Pelaku UMKM jarang tahu dokumen apa yang sebenarnya mereka butuhkan.
+
+Mereka tidak berpikir *"saya perlu company profile"*. Yang ada di kepala
+mereka adalah *"saya mau produk saya masuk ke kafe"*.
+
+Semua pembuat presentasi ber-AI yang ada sekarang menuntut pengguna sudah tahu
+mau membuat apa: pilih template dulu, tulis prompt dulu. Bagi pemilik warung
+atau produsen keripik rumahan, pertanyaan itu sendiri sudah jadi penghalang.
+
+PitchKu membalik urutannya.
+
+---
+
+## Tiga tahap generasi
+
+### Tahap 0 — Diagnosa
+
+Pintu masuknya satu pertanyaan terbuka. Pengguna cukup menceritakan tujuannya
+dengan bahasa sehari-hari, lalu **sistem yang menentukan** dokumen apa yang
+cocok, beserta alasannya.
+
+```
+Pengguna:  "saya mau kopi saya masuk ke kafe-kafe di Jogja"
+                          │
+                          ▼
+PitchKu:   Template "Penawaran Produk"
+           Alasan  — kamu menawarkan produk ke pembeli grosir, jadi
+                     yang mereka cari adalah harga satuan, MOQ,
+                     margin reseller, dan izin edar
 ```
 
-Buka http://localhost:4000/docs
+Diagnosa berjalan dari aturan kata kunci di backend, bukan dari LLM. Hasilnya
+konsisten, instan, dan tidak memakan biaya token.
 
-Uji cepat tanpa Supabase asli:
+### Tahap 1 — Kerangka
 
-```bash
-npm run smoke
+Sistem menyusun 8–10 judul slide untuk **ditinjau pengguna sebelum isinya
+dibuat**. Memperbaiki kerangka jauh lebih murah daripada mengulang satu deck
+utuh, baik dari sisi waktu pengguna maupun biaya LLM.
+
+### Tahap 2 — Isi
+
+Konten lengkap disusun mengikuti kerangka yang sudah disunting pengguna, lalu
+divalidasi terhadap skema kanonik sebelum dikirim ke editor.
+
+---
+
+## Yang membedakan PitchKu
+
+| | Kenapa ini penting |
+|---|---|
+| **Diagnosa sebelum generasi** | Pengguna tidak perlu tahu istilah "company profile" atau "proposal kerja sama" untuk bisa memulai |
+| **Pengetahuan bisnis UMKM tertanam di sistem** | Tiap template membawa checklist yang dikurasi: MOQ, margin reseller, kapasitas produksi, izin **PIRT / halal / BPOM**, skema bagi hasil. Generator umum tidak akan menanyakan hal-hal ini |
+| **PPTX yang benar-benar bisa diedit** | Hasil unduhan berisi kotak teks dan shape asli PowerPoint, **bukan gambar**. Pemilik usaha bisa mengganti harga sendiri tanpa membuka PitchKu lagi |
+| **Batas teks ditegakkan kode, bukan permintaan ke LLM** | Judul dibatasi 60 karakter oleh skema Zod. Judul yang kepanjangan ditolak, bukan sekadar "diminta jangan panjang" ke model — jadi teks tidak pernah meluber di layar proyeksi |
+| **Warna merek dikoreksi untuk proyektor** | Warna gelap dicerahkan otomatis untuk teks kecil di atas latar gelap, karena PPTX diproyeksikan dan tidak bisa di-zoom seperti di layar laptop |
+
+---
+
+## Arsitektur
+
+Tiga service terpisah yang berkomunikasi lewat REST:
+
+```
+┌──────────────────┐        Bearer JWT         ┌──────────────────────┐
+│  pitchku-        │ ────────────────────────► │  pitchku-backend     │
+│  frontend        │ ◄──────────────────────── │  (repo ini)          │
+│                  │      JSON over HTTP       │                      │
+│  Vite + React    │                           │  3 tahap generasi    │
+│  Editor kanvas   │                           │  Mesin ekspor PPTX   │
+│  16:9            │                           │  Brand kit, projects │
+└──────────────────┘                           └───────┬──────────────┘
+         │                                             │
+         │ login langsung                              │ POST /decks/generate
+         ▼                                             ▼
+┌──────────────────┐                           ┌──────────────────────┐
+│  Supabase Auth   │                           │  pitchku-ai          │
+│  + Postgres RLS  │ ◄─────────────────────────│  Layanan LLM         │
+└──────────────────┘   query membawa token     └──────────────────────┘
+                       milik pengguna
 ```
 
-Menghasilkan `contoh-hasil.pptx` dan memverifikasi semua endpoint.
+**Keamanan lewat Row Level Security.** Backend tidak pernah memegang password,
+termasuk pada alur Google OAuth. Frontend login langsung ke Supabase, lalu
+mengirim `access_token` ke backend. Karena setiap query dijalankan memakai
+token milik pengguna, pembatasan akses ditangani sepenuhnya oleh RLS di
+database — backend tidak perlu mengecek `user_id` secara manual, sehingga
+tidak mungkin lupa mengeceknya.
 
-## Setup Supabase & Google OAuth
+---
 
-Lihat **[docs/SETUP.md](docs/SETUP.md)** — langkah demi langkah, termasuk
-kode yang perlu Daffa pakai di frontend.
+## Bukti terverifikasi
+
+Hasil `npm run smoke`, dijalankan sebelum kode diserahkan:
+
+| Yang diuji | Hasil |
+|---|---|
+| Ekspor PPTX 6 slide | Berhasil, ~133 KB, magic bytes ZIP valid |
+| Judul 80 karakter | **Ditolak** skema — batas 60 ditegakkan di kode |
+| Endpoint tanpa token / token asal-asalan | Sama-sama dibalas **401** |
+| Endpoint terdokumentasi di Swagger | 8 endpoint, `/docs` merespons 200 |
+
+Berkas `.pptx` hasilnya diekstrak dan diperiksa isinya satu per satu:
+
+> ### 60 kotak teks native · 43 shape native · **0 gambar**
+
+Angka terakhir itu yang paling menentukan. Nol gambar berarti tidak ada satu
+pun slide yang ditempel sebagai screenshot — seluruh teksnya bisa diklik,
+diseleksi, dan disunting langsung di PowerPoint. Ini syarat mutlak di FRD, dan
+merupakan hal yang banyak generator presentasi ber-AI justru gagal penuhi.
+
+Keenam slide juga dibuka di PowerPoint lalu diekspor menjadi PNG untuk
+dibandingkan langsung dengan tampilan editor.
 
 ---
 
@@ -44,189 +140,69 @@ kode yang perlu Daffa pakai di frontend.
 
 | Method | Path | Fungsi |
 |---|---|---|
-| GET | `/health` | Cek server hidup |
-| GET | `/docs` | Swagger UI |
-| GET | `/openapi.json` | Spesifikasi OpenAPI mentah |
-| POST | `/api/generate/diagnose` | **Tahap 0** — cari tahu dokumen apa yang dibutuhkan |
-| POST | `/api/generate/outline` | **Tahap 1** — kerangka slide |
-| POST | `/api/generate/slides` | **Tahap 2** — isi slide |
-| GET | `/api/brand-kit` | Ambil brand kit |
-| POST / PUT | `/api/brand-kit` | Simpan warna dan logo |
-| GET | `/api/projects` | Daftar deck |
+| POST | `/api/generate/diagnose` | **Tahap 0** — tentukan dokumen yang dibutuhkan |
+| POST | `/api/generate/outline` | **Tahap 1** — susun kerangka slide |
+| POST | `/api/generate/slides` | **Tahap 2** — susun isi slide |
+| POST | `/api/export/pptx` | Unduh berkas `.pptx` |
+| GET | `/api/projects` | Daftar deck milik pengguna |
 | POST | `/api/projects` | Simpan deck sebagai versi baru |
 | GET | `/api/projects/:id` | Buka versi terbaru |
 | DELETE | `/api/projects/:id` | Hapus deck |
-| POST | `/api/export/pptx` | Unduh berkas .pptx |
+| GET | `/api/brand-kit` | Ambil brand kit |
+| POST / PUT | `/api/brand-kit` | Simpan warna dan logo |
+| GET | `/health` | Cek server hidup |
+| GET | `/docs` | Swagger UI |
+
+Spesifikasi OpenAPI dibangkitkan otomatis dari skema Zod, jadi dokumentasi
+tidak pernah basi terhadap kode. Bisa dicoba langsung di
+**[/docs](https://pitchku-backend-production.up.railway.app/docs)**.
 
 ---
 
-## Tiga tahap generasi
+## Menjalankan di lokal
 
-Alur aslinya dua tahap. Tahap 0 ditambahkan dari ide Rifka.
-
-**Tahap 0 — Diagnosa.** Pengguna UMKM sering tidak tahu dokumen apa yang dia
-butuhkan. Dia tidak berpikir "saya perlu company profile", dia berpikir "saya
-mau produk saya masuk ke kafe". Jadi pintu masuknya satu pertanyaan terbuka,
-lalu sistem yang menyarankan template beserta alasannya.
-
-Ini pembeda utama PitchKu. Tools presentasi lain menuntut pengguna sudah tahu
-mau bikin apa.
-
-**Tahap 1 — Kerangka.** 8-10 judul slide untuk ditinjau pengguna sebelum isi
-dibuat. Memperbaiki di tahap ini jauh lebih murah daripada mengulang seluruh
-deck.
-
-**Tahap 2 — Isi.** Konten lengkap mengikuti kerangka yang sudah disunting
-pengguna, divalidasi terhadap skema kanonik.
-
-### Hubungan dengan pitchku-ai
-
-AI berjalan di service terpisah, `pitchku-ai` (repo Rifka), yang menyediakan
-satu endpoint: `POST /api/v1/decks/generate` dengan body `{ business, goal }`,
-membalas 10 slide berbentuk `{ title, subtitle, content[], visual }`.
-`src/services/ai.js` menjembatani endpoint itu dengan tiga tahap di atas:
-
-| Tahap | Sumber |
-|---|---|
-| Diagnosa | Aturan kata kunci di backend. pitchku-ai belum punya endpoint diagnosa. |
-| Kerangka | Satu deck dibuat di pitchku-ai; judul slide-nya jadi kerangka. Deck disimpan di memori selama 1 jam. |
-| Isi | Deck dari tahap kerangka diubah ke bentuk editor. Kalau tidak ada di memori (server restart), pitchku-ai dipanggil lagi dengan kerangka pengguna. |
-
-Layout dipilih dari isi slide: poin berformat `Label: isi` jadi kartu
-(`two_column`, `card_grid`, atau `metrics_grid` kalau labelnya angka), slide
-pertama jadi sampul, dan slide terakhir berisi kontak jadi `contact_closing`.
-Supaya itu terjadi, backend meminta format tersebut lewat field `goal`.
-
-Pengetahuan bisnis per template ada di `TEMPLATE_INFO` di `src/services/ai.js`,
-dikirim ke pitchku-ai sebagai bagian dari `goal`. Kalau pemilik usaha bilang
-ada hal penting yang selalu terlewat, tambahkan ke checklist di situ.
-
----
-
-## Struktur
-
-```
-src/
-├── index.js              server + Swagger
-├── env.js                validasi env
-├── openapi.js            definisi endpoint untuk Swagger
-├── schemas/slide.js      KONTRAK KANONIK — jangan diubah sendirian
-├── lib/
-│   ├── supabase.js       klien per-permintaan (RLS) & admin
-│   └── auth.js           middleware Bearer token
-├── services/
-│   ├── ai.js             tiga tahap generasi + checklist template  [Rifka]
-│   └── pptx.js           mesin ekspor, koordinat inci 6 layout     [Risfa]
-│                         desainnya mengikuti kanvas editor di
-│                         pitchku-frontend, lihat catatan di bawah
-└── routes/
-    ├── generate.js
-    ├── brandKit.js
-    ├── projects.js
-    └── exportPptx.js
+```bash
+npm install
+cp .env.example .env     # isi kredensialnya, lihat docs/SETUP.md
+npm run dev
 ```
 
-`src/schemas/slide.js` adalah satu-satunya sumber kebenaran bentuk data slide.
-Setiap perubahan di berkas itu wajib diumumkan ke grup — menyentuh pekerjaan
-tiga orang sekaligus.
+Lalu buka http://localhost:4000/docs
 
-Karena pakai JavaScript, kontrak ini menjaga bentuk data saat runtime tapi
-tidak memberi autocomplete di editor. Daffa bisa membangkitkan tipe dari
-`/openapi.json` kalau butuh.
+Untuk menguji cepat tanpa menyiapkan Supabase:
 
----
+```bash
+npm run smoke
+```
 
-## Desain slide mengikuti frontend
-
-Dulu `pptx.js` punya desainnya sendiri (latar putih, judul warna primer), jadi
-berkas unduhan kelihatan seperti presentasi lain dari yang dilihat pengguna di
-editor. Sekarang sumber desainnya satu: **kanvas editor di `pitchku-frontend`**,
-yaitu `src/components/SlideEditor/SlideLayoutRenderer.jsx` dan `SlideCanvas.jsx`.
-
-Kanvas web itu berukuran tetap 960 x 540 px dan slide PPTX 16:9 berukuran
-10 x 5.625 inci, jadi konversinya bulat: **96 px = 1 inci**, **1 px = 0.75 pt**.
-Di `pptx.js` konversi itu jadi dua fungsi kecil, `px()` dan `pt()`, dan hampir
-semua angka layout ditulis dalam satuan px kanvas supaya bisa dicocokkan
-langsung dengan kelas Tailwind di renderer.
-
-Yang ikut disalin: latar `#070C15`, kartu `#0F1A2E` dengan border `#1E293B`,
-badge "BAB 01 • COVER" di kiri atas, logo di kanan atas (tidak muncul di
-cover), bar footer berisi judul deck dan nomor slide, garis aksen di atas tiap
-judul, serta enam layout dengan susunan yang sama.
-
-Ada dua hal yang sengaja **tidak** persis sama:
-
-1. **Warna merek yang gelap dicerahkan** untuk teks kecil dan garis tipis di
-   atas latar gelap (fungsi `onDark`). Primary `#0F4C81` di atas `#070C15`
-   nyaris tidak terbaca, dan PPTX sering diproyeksikan, tidak bisa di-zoom
-   seperti di aplikasi. Warna isian kartu dan badge tetap memakai warna asli.
-2. **Gambar diambil lebih dulu** oleh backend dengan batas waktu 6 detik dan
-   ukuran 5 MB, lalu ditanam sebagai data URI. Kalau URL-nya mati, slide itu
-   jatuh ke kotak placeholder gelap seperti di editor, dan ekspor tetap jadi.
-
-Font memakai `brandKit.fontFamily` (default Inter) seperti di editor. Inter
-bukan font bawaan Windows, jadi kalau pengguna belum memasangnya PowerPoint
-akan menggantinya sendiri — kotak teksnya sudah dikasih ruang lebih supaya
-pergantian font itu tidak bikin teks meluber.
-
-Kalau renderer di frontend berubah, `pptx.js` harus ikut diubah. Tidak ada tes
-yang menangkap ini otomatis; cara cek tercepat masih `npm run smoke` lalu buka
-`contoh-hasil.pptx` dan bandingkan dengan editor.
+Perintah itu memverifikasi seluruh endpoint sekaligus menghasilkan
+`contoh-hasil.pptx` yang bisa langsung dibuka di PowerPoint.
 
 ---
 
-## Cara auth bekerja
+## Rencana lanjutan
 
-Backend tidak pernah memegang password, termasuk untuk Google OAuth.
+Beberapa hal sengaja ditahan agar alur inti — diagnosa, generasi, ekspor —
+bisa diselesaikan dan diverifikasi lebih dulu.
 
-1. Frontend login langsung ke Supabase
-2. Supabase mengembalikan `access_token` (JWT)
-3. Frontend kirim ke backend: `Authorization: Bearer <token>`
-4. `requireAuth` memverifikasi token, lalu menyiapkan `req.db` yang membawa
-   token itu
-
-Karena setiap query pakai token pengguna, Row Level Security yang menjamin
-seseorang hanya bisa mengakses deck miliknya. Backend tidak perlu mengecek
-`user_id` manual, dan tidak bisa lupa mengeceknya.
-
----
-
-## Yang sudah diverifikasi
-
-Hasil `npm run smoke` sebelum kode ini diserahkan:
-
-- Skema `DeckPayload` lolos untuk payload 6 slide
-- Judul 80 karakter **ditolak** skema (batas 60 ditegakkan, bukan cuma diminta ke LLM)
-- Ekspor PPTX 6 slide berhasil, ~133 KB, magic bytes ZIP valid
-- 8 endpoint terdokumentasi di Swagger, `/docs` merespons 200
-- Endpoint tanpa token dan dengan token ngawur sama-sama 401
-
-Berkas hasilnya juga dibongkar dan diperiksa isinya: **60 kotak teks native,
-43 shape native, 0 gambar**. Ini bukti syarat mutlak FRD terpenuhi — slide
-bukan gambar tempelan, teksnya bisa diklik dan disunting di PowerPoint.
-
-Keenam slide juga dibuka di PowerPoint dan diekspor jadi PNG untuk
-dibandingkan dengan tampilan editor.
-
----
-
-## Yang belum dikerjakan
-
-| Belum ada | Catatan |
+| Rencana | Status sekarang |
 |---|---|
-| Endpoint unggah logo | Bucket `logos` sudah dibuat di migrasi, endpointnya belum |
-| Gambar stok Unsplash | `imageQuery` sudah dihasilkan AI, pemanggilan API belum |
-| Ekspor PDF | Butuh Puppeteer atau Playwright |
-| `project_id` di log | Sekarang selalu `null` karena proyek belum ada saat generate. Perlu diputuskan: buat proyek dulu, atau tambal log setelahnya. |
-| Rate limit | Panggilan LLM berbiaya. Penting sebelum dibuka ke publik. |
-| Testing otomatis | Baru ada smoke test manual |
+| Endpoint unggah logo | Bucket penyimpanan sudah disiapkan di migrasi, endpointnya menyusul |
+| Rate limit | Perlu ditambahkan sebelum dibuka ke publik, karena tiap panggilan LLM ada biayanya |
+| Gambar stok Unsplash | Kata kunci gambar sudah dihasilkan AI per slide, tinggal menyambungkan ke API penyedia |
+| Ekspor PDF | Frontend sudah menyediakan ekspor PDF di sisi klien, jadi versi server belum mendesak |
+| Pengujian otomatis | Saat ini memakai smoke test menyeluruh yang dijalankan manual |
 
-## Catatan deployment
+---
 
-FRD menyebut Vercel, tapi itu untuk frontend Next.js. Untuk Express terpisah,
-serverless Vercel punya batas durasi yang berisiko untuk generasi PPTX.
-Lebih aman ke Railway, Render, atau Fly.io yang jalan sebagai proses biasa.
+## Tim
 
-Dari sisi disk sudah aman: konversi PPTX murni di memori pakai
-`outputType: "nodebuffer"`, tidak menulis berkas fisik ke server. Yang perlu
-diawasi cuma batas waktu eksekusinya.
+| Peran | Orang | Repo |
+|---|---|---|
+| Backend | Risfa | repo ini |
+| AI Engine | Rifka | [`pitchku-ai`](https://github.com/KADA-Sprint-7/pitchku-ai) |
+| Frontend | Daffa | [`pitchku-frontend`](https://github.com/KADA-Sprint-7/pitchku-frontend) |
+
+Catatan teknis untuk kontributor ada di **[CONTRIBUTING.md](CONTRIBUTING.md)** —
+kontrak data antar-repo, cara sinkron dengan `pitchku-ai`, dan catatan
+deployment.
